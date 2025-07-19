@@ -1,4 +1,7 @@
 import nodemailer from "nodemailer";
+import dotenv from 'dotenv';
+dotenv.config();
+
 
 export async function sendEmailForFirstTimeVerification(user) {
   const transporter = nodemailer.createTransport({
@@ -17,7 +20,7 @@ export async function sendEmailForFirstTimeVerification(user) {
       <br>
       <p>Please verify your account by clicking <a href="${process.env.BASE_URL}/api/v1/auth/verify/?token=${user.verificationToken}">here</a>.</p>
       <br>
-      <p>${BASE_URL}/api/v1/auth/verify/?token=${user.verificationToken}</P>
+      <p>${process.env.BASE_URL}/api/v1/auth/verify/?token=${user.verificationToken}</p>
     `,
   };
 
