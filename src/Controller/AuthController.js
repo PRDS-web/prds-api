@@ -7,6 +7,8 @@ import argon from "argon2";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { sendEmailForFirstTimeVerification } from "../Utils/Mail/Mailer.js";
+import axios from "axios";
+import { get } from "http";
 
 export async function registerUser(req, res) {
   const { email, password, confirmPassword } = req.body;
@@ -99,6 +101,7 @@ export async function verifyUser(req, res) {
       });
     }
     isTokenThere.isVerified = true;
+    isTokenThere.verificationToken = null; // Clear the verification token after successful verification
     await isTokenThere.save();
     return res.status(200).json({
       title: "Verification Successfully",
@@ -167,6 +170,105 @@ export function logoutUser(req, res) {
   });
 }
 
-export function SSOSignin(req,res){
+export async function SSOSignin(req,res){
+    const code  =  req.query.code;
+    if(!code){
+        return res.status(400).json({
+            title: "Invalid Request",
+            message: "Please pass the code in query params"
+        });
+    }
 
+    console.log("Code received from SSO", code);
+    const token = getAccessToken(code);
+    if(!token){
+        return res.status(500).json({
+            title: "Internal Server Error",
+            message: "There is something went wrong while getting access token"
+        });
+    }
+    console.log("Access token received from SSO", token);
+    const userInfo = getUserInfo(token);
+    if(!userInfo){
+        return res.status(500).json({
+            title: "Internal Server Error",
+            message: "There is something went wrong while getting user info"
+        });
+    }   
+    console.log("User info received from SSO", userInfo);
+    const { email, name, picture } = userInfo;
+    const isUserAlreadyPresent = await User.findOne({ email }).select("-password -__v");
+
+    if (isUserAlreadyPresent) {
+        console.log("User already exists");
+        // Generate JWT token for the existing user
+        const jwtTokens = jwt.sign({ id: isUserAlreadyPresent._id }, process.env.JWT_SECRET, {
+            expiresIn: "7d",
+            issuer: "prds-api",
+        });
+        console.log("Cookies generated successfully");
+        res.cookie("authToken", jwtTokens, {
+            httpOnly: true, 
+            secure: true,
+            sameSite: true,
+            maxAge: 1000 * 60 * 60 * 24 * 7,
+        });
+        console.log("User logged in successfully", isUserAlreadyPresent.email);
+
+        return res.status(200).json({
+            user: isUserAlreadyPresent,
+            title: "User Logged In",
+            message: "User has been logged in successfully",
+        });
+    }
+    const newUser = new User({email, name, picture });
+    await newUser.save();
+
+    console.log("New user created successfully", newUser);
+    const jwtToken = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET, {
+        expiresIn: "7d",
+        issuer: "prds-api",
+    });
+
+    console.log("Cookies generated successfully");
+    res.cookie("authToken", jwtToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: true,
+        maxAge: 1000 * 60 * 60 * 24 * 7,
+    });
+    console.log("User logged in successfully", newUser.email);
+    // Send response to the client
+    return res.status(201).json({
+        title: "User Created",
+        message: "User has been created successfully",
+    });
+}
+
+async function getAccessToken(code) {
+    const response = await axios.post(
+    'https://oauth2.googleapis.com/token',
+    new URLSearchParams({
+      code: code,
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      client_secret: process.env.GOOGLE_SECRET,
+      redirect_uri: `${window.location.origin}/oauthify-redirect`,
+      grant_type: 'authorization_code',
+    }),
+    {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    }
+  );
+  return response.data.access_token;
+}
+
+async function getUserInfo(token) {
+  const response = await axios.get('https://www.googleapis.com/oauth2/v1/userinfo', {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return response.data;
 }

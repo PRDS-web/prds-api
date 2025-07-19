@@ -8,6 +8,6 @@ router.post("/register",registerUser);
 router.get('/verify',verifyUser);
 router.post('/login',loginUser);
 router.get('/logout',logoutUser);
-router.get('sso',SSOSignin)
+router.get('/sso',SSOSignin)
 
 export default router;
