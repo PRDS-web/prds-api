@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import ConnectWithDB from './Utils/DBConnection.js';
+import AuthRoutes from './Routes/Auth/AuthRoutes.js';
 
 const app = express();
 const port  = 8080;
@@ -23,6 +24,8 @@ ConnectWithDB();
 app.get('/',(req, res) =>{
     res.send("I am very happy today");
 });
+
+app.use('/api/v1/auth',AuthRoutes);
 
 app.listen(port,()=>{
     console.log("Initial Setup is done good to go now");
