@@ -6,25 +6,29 @@ export async function getUserInfo(req, res) {
     try{
         // Fetch user information from the database using the userId and using (-) minus sign we are using in select
         // to exclude password and __v field from the response
-        const user = await User.findById(userId).select("-password -__v");
+        const user = await User.findById(userId).select("-password -__v -_id");
         if (!user) {
             return res.status(404).json({
                 message: "User not found.",
-                title: "Not Found"
+                title: "Not Found",
+                status: 404
+
             });
         }
-        console.log("User information retrieved:", user);
+        console.log("User inform`ation retrieved:", user);
         return res.status(200).json({
             user,
             message: "User information retrieved successfully.",
-            title: "User Info"
+            title: "User Info",
+            status: 200
         });
 
     }catch(error){
         console.error("Error fetching user info:", error);
         return res.status(500).json({
             message: "Internal server error while fetching user info.",
-            title: "Server Error"
+            title: "Server Error",
+            status: 500
         });
     }
    
@@ -36,13 +40,15 @@ export async function getAllUsers(req, res) {
         return res.status(200).json({
             users,
             message: "All users retrieved successfully.",
-            title: "All Users"
+            title: "All Users",
+            status: 200
         });
     } catch (error) {
         console.error("Error fetching all users:", error);
         return res.status(500).json({
             message: "Internal server error while fetching all users.",
-            title: "Server Error"
+            title: "Server Error",
+            status: 500
         });
     }
 }
@@ -62,7 +68,8 @@ export async function updateProfile(req, res) {
         if (!updatedUser) {
             return res.status(404).json({
                 message: "User not found.",
-                title: "Not Found"
+                title: "Not Found",
+                status: 404
             });
         }
 
@@ -70,14 +77,16 @@ export async function updateProfile(req, res) {
         return res.status(200).json({
             user: updatedUser,
             message: "Profile updated successfully.",
-            title: "Profile Updated"
+            title: "Profile Updated",
+            status: 200
         });
 
     } catch (error) {
         console.error("Error updating profile:", error);
         return res.status(500).json({
             message: "Internal server error while updating profile.",
-            title: "Server Error"
+            title: "Server Error",
+            status: 500
         });
     }
 }

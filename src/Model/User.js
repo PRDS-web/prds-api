@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 
 const userSchema = mongoose.Schema({
-    userId: mongoose.Types.UUID,
     name: {
         type: String,
         required: true
@@ -15,17 +14,38 @@ const userSchema = mongoose.Schema({
         type: String,
         required: true,
     },
-    country: String, 
-    picture: String,
+    country: { 
+        type: String,
+        default: 'NA' 
+    }, 
+    picture: { 
+        type: String,
+        default: null 
+    },
     skills: {
         type: Array,
         default: []
     },
-    linkedIn: String,
-    mobileNumber: String,
-    github: String,
-    isVerified: Boolean,
-    verificationToken: String,
+    linkedIn: { 
+        type: String,
+        default: 'NA' 
+    },
+    mobileNumber: { 
+        type: String, 
+        default: 'NA'
+    },
+    github: { 
+        type: String, 
+        default: 'NA' 
+    },
+    isVerified: { 
+        type: Boolean, 
+        default: false 
+    },
+    verificationToken: { 
+        type: String, 
+        default: 'NA' 
+    },
     password: {
         type: String,
         required:  true
