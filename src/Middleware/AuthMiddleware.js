@@ -10,7 +10,8 @@ export async function verifyToken(req, res, next) {
     if (!token) {
         return res.status(401).json({
             message: "Unauthorized access, token is missing, please login again.",
-            title: "Unauthorized Access"
+            title: "Unauthorized Access",
+            status: 401
         });
     }
     try {
@@ -19,7 +20,8 @@ export async function verifyToken(req, res, next) {
         if(iss !== process.env.ISSUER) {
             return res.status(401).json({
                 message: "Unauthorized access, invalid token issuer, please login again.",
-                title: "Unauthorized Access"
+                title: "Unauthorized Access",
+                status: 401
             });
         }
         // Check if the token has expired as we are expire info in seconds thats why we are comparing
@@ -27,7 +29,8 @@ export async function verifyToken(req, res, next) {
         if(exp< Math.floor(new Date()/1000)){
             return res.status(401).json({
                 message: "Unauthorized access, token has expired, please login again.",
-                title: "Unauthorized Access"
+                title: "Unauthorized Access",
+                status: 401
             });
         }
         // If everything is fine we are attaching the user id to the request object so that we can use it
@@ -37,7 +40,8 @@ export async function verifyToken(req, res, next) {
     } catch (error) {
         return res.status(401).json({
             message: "Unauthorized access, invalid token, please login again.",
-            title: "Unauthorized Access"
+            title: "Unauthorized Access",
+            status: 401
         });
     }
 }
