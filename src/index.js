@@ -10,7 +10,7 @@ const port  = 8080;
 
 
 app.use(cors({
-    origin: ["http://localhost:5173"],
+    origin: ["http://localhost:5173", "https://prds-ui.vercel.app"],
     credentials: true,
     methods: ['GET','POST','PATCH','PUT'],
     allowedHeaders: ['Content-Type', 'Authorization']
