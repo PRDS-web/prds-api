@@ -8,6 +8,9 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { sendEmailForFirstTimeVerification } from "../Utils/Mail/Mailer.js";
 import axios from "axios";
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 export async function registerUser(req, res) {
   const { email, password, confirmPassword } = req.body;
@@ -303,7 +306,7 @@ async function getAccessToken(code, originUrl) {
     "https://oauth2.googleapis.com/token",
     new URLSearchParams({
       code,
-      client_id: process.env.GOOGLE_CLIENT_ID,
+      client_id: "878291443758-klfu3caf4hnvj23vu5i5lgfj93g8gsh9.apps.googleusercontent.com",
       client_secret: process.env.GOOGLE_SECRET,
       redirect_uri: `${originUrl}/oauthify-redirect`,
       grant_type: "authorization_code",
