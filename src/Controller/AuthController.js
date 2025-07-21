@@ -284,8 +284,10 @@ export async function SSOSignin(req, res) {
       maxAge: 1000 * 60 * 60 * 24 * 7,
     });
     console.log("User logged in successfully", newUser.email);
+    const { _id,password, ...userWithoutId } = newUser.toObject(); // Remove _id and password from the response
     // Send response to the client
     return res.status(201).json({
+      user: userWithoutId,
       title: "User Created",
       message: "User has been created successfully",
       status: 201
