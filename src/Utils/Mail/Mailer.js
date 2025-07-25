@@ -10,7 +10,7 @@ const verificationMailTemplate = fs.readFileSync(
   "utf8"
 );
 const resetPasswordMailTemplate = fs.readFileSync(
-  path.join(process.cwd(), "src/Utils/MailTemplate/resetPasswordMail.html"),
+  path.join(process.cwd(), "src/Utils/MailTemplate/ResetPasswordMail.html"),
   "utf8"
 );
 
