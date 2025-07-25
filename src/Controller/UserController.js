@@ -15,7 +15,7 @@ export async function getUserInfo(req, res) {
 
             });
         }
-        console.log("User inform`ation retrieved:", user);
+        console.log("User information retrieved:", user);
         return res.status(200).json({
             user,
             message: "User information retrieved successfully.",
