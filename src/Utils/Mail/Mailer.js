@@ -1,8 +1,20 @@
 import nodemailer from "nodemailer";
+import fs from "fs";
+import path from "path";
 import dotenv from "dotenv";
+
 dotenv.config();
 
-export async function sendEmailForFirstTimeVerification(user) {
+const verificationMailTemplate = fs.readFileSync(
+  path.join(process.cwd(), "src/Utils/MailTemplate/verificationMail.html"),
+  "utf8"
+);
+const resetPasswordMailTemplate = fs.readFileSync(
+  path.join(process.cwd(), "src/Utils/MailTemplate/resetPasswordMail.html"),
+  "utf8"
+);
+
+export async function sendEmailForFirstTimeVerification(user, type) {
   const transporter = nodemailer.createTransport({
     service: "Gmail",
     auth: {
@@ -24,18 +36,33 @@ export async function sendEmailForFirstTimeVerification(user) {
       }
     });
   });
-  const mailOptions = {
-    to: user.email,
-    subject: "Verify Your Account",
-    html: `
-      <p>Hello ${user.name},</p>
-      <p>Welcome to PRDS</p>
-      <br>
-      <p>Please verify your account by clicking <a href="${process.env.BASE_URL}/api/v1/auth/verify/?token=${user.verificationToken}">here</a>.</p>
-      <br>
-      <p>${process.env.BASE_URL}/api/v1/auth/verify/?token=${user.verificationToken}</p>
-    `,
-  };
+  let mailOptions = {};
+  if (type === "verification") {
+    mailOptions = {
+      to: user.email,
+      subject: "Verify Your Account",
+      html: verificationMailTemplate
+        .replace("{{userName}}", user.name)
+        .replace(
+          "{{verificationLink}}",
+          `${process.env.BASE_URL}/auth/verify/?token=${user.verificationToken}`
+        ).replace(
+          "{{verificationLink}}",
+          `${process.env.BASE_URL}/auth/verify/?token=${user.verificationToken}`
+        ).replace(
+          "{{verificationLink}}",
+          `${process.env.BASE_URL}/auth/verify/?token=${user.verificationToken}`
+        ),
+    };
+  } else if (type === "resetPassword") {
+    mailOptions = {
+      to: user.email,
+      subject: "Reset Your Password",
+      html: resetPasswordMailTemplate
+        .replace("{{name}}", user.name)
+        .replace("{{reset_link}}", `${process.env.BASE_URL}/auth/reset-password?token=${user.resetPasswordToken}`),
+    };
+  }
 
   console.log("Triggering Mail from Mailer.js to ", user.email);
 
