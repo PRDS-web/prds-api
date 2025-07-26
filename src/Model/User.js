@@ -5,6 +5,14 @@ const userSchema = mongoose.Schema({
         type: String,
         required: true
     },
+    userId: {
+        type: String,
+        default: 'NA'
+    },
+    githubId: {
+        type: String,
+        default: 'NA'
+    },
     role: {
         type: String,
         enum: ['user', 'admin','client'],
@@ -13,6 +21,7 @@ const userSchema = mongoose.Schema({
     email: {
         type: String,
         required: true,
+        default: 'NA'
     },
     country: { 
         type: String,
