@@ -217,8 +217,8 @@ export async function loginUser(req, res) {
   }
 
   const isValidUser = await User.findOne({ email }).select(
-      "-__v -createdAt -updatedAt -role -country -skills -linkedIn -mobileNumber -github -verificationToken -loggedInType -resetPasswordToken"
-    );
+    "-__v -createdAt -updatedAt -role -country -skills -linkedIn -mobileNumber -github -verificationToken -loggedInType -resetPasswordToken"
+  );
 
   if (isValidUser == null || isValidUser == undefined) {
     return res.status(404).send({
@@ -259,9 +259,10 @@ export async function loginUser(req, res) {
     sameSite: "none",
     maxAge: 1000 * 60 * 60 * 24 * 7,
   });
-  //const { _id, password: _, ...userWithoutId } = isValidUser.toObject(); // Remove _id and password from the response
+  const { _id, password: _, ...userWithoutId } = isValidUser.toObject(); // Remove _id and password from the response
 
   return res.status(200).json({
+    user: userWithoutId,
     title: "Valid Password",
     message: "Login Successfully",
     status: 200,
@@ -279,28 +280,195 @@ export function logoutUser(req, res) {
 
 export async function SSOSignin(req, res) {
   const code = req.query.code;
+  const type = req.query.type;
   //this is use for redirecting back to the origin URL after successful SSO login
-  const originUrl = req.get("origin");
+  let originUrl = req.get("origin");
 
   if (!code) {
     return res.status(400).json({
       title: "Invalid Request",
-      message: "Please pass the code in query params",
+      message: "Please pass the token in query params",
+      status: 400,
+    });
+  }
+  console.log(type);
+  const loginType = type?.trim().toLowerCase();
+  if (!type && (loginType != "google" || loginType != "github")) {
+    return res.status(400).json({
+      title: "Bad Request",
+      message: "Please pass the correct sso type query params",
       status: 400,
     });
   }
 
-  console.log("Code received from SSO", code);
-  const token = await getAccessToken(code, originUrl);
-  console.log("Access token received from SSO");
-  if (!token) {
+  if (loginType == "google") {
+    return loginWithGoogle(code, res);
+  }
+  console.log("code received from github sso", code.trim());
+  const token = await getAccessTokenForGithub(code.trim(), originUrl, res);
+
+  console.log("Token received from github");
+  try {
+    const userInfo = await getUserInfoFromGithub(token);
+    if (!userInfo) {
+      return res.status(500).json({
+        title: "Internal Server Error",
+        message: "There is something went wrong while getting user info",
+        status: 500,
+      });
+    }
+    console.log("User info received from github SSO", userInfo);
+    const { email, name, id,login, avatar_url, html_url } = userInfo;
+    const userSearch = User.findOne({
+      $or: [
+        {
+          githubId: id,
+          email
+        }
+      ]
+    }).select(
+        "-password -__v -createdAt -updatedAt -role -email -country -skills -linkedIn -mobileNumber -github -isVerified -verificationToken -loggedInType -resetPasswordToken"
+      );
+
+    if(!userSearch){
+        console.log("User already exists in db from github sso");
+        // Generate JWT token for the existing user
+        const jwtTokens = jwt.sign(
+          { id: isUserAlreadyPresent._id },
+          process.env.JWT_SECRET,
+          {
+            expiresIn: "7d",
+            issuer: "prds-api",
+          }
+        );
+        console.log("Cookies generated successfully");
+        res.cookie("authToken", jwtTokens, {
+          httpOnly: true,
+          secure: true,
+          sameSite: "none",
+          maxAge: 1000 * 60 * 60 * 24 * 7,
+        });
+        console.log("User logged in successfully", isUserAlreadyPresent.name);
+        // Here toObject is used because when we get the user from DB that is not a plain object
+        // its a mongoose document so we need to convert it to plain object for that we use toObject method
+        const { _id, ...userWithoutId } = isUserAlreadyPresent.toObject(); // Remove _id from the response
+        return res.status(200).json({
+          user: userWithoutId,
+          title: "User Logged In",
+          message: "User has been logged in successfully",
+          status: 200,
+        });
+    }
+    // As user logged in for the first time, we will create a new user and store password as hex
+      // because we are not using password for SSO users
+      const tempPassword = await argon.hash(crypto.randomBytes(32).toString("hex"));
+      const newUser = new User({
+        email: email==null?'NA':email,
+        name,
+        picture: avatar_url,
+        githubId: id,
+        github: html_url,
+        userId: login,
+        loggedInType: "GithubSSO",
+        isVerified: true,
+        verificationToken: null,
+        password: tempPassword, // Store the JWT token as password for SSO users
+      });
+      await newUser.save();
+
+      console.log("New user created successfully", newUser);
+      const jwtToken = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET, {
+        expiresIn: "7d",
+        issuer: "prds-api",
+      });
+
+      console.log("Cookies generated successfully");
+      res.cookie("authToken", jwtToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "none",
+        maxAge: 1000 * 60 * 60 * 24 * 7,
+      });
+      console.log("User logged in successfully", newUser.name);
+      const { _id, password,githubId,isVerified,linkedIn,mobileNumber,verificationToken,_v,country,createdAt,skills,updatedAt,loggedInType,github,  ...userWithoutId } = newUser.toObject(); // Remove _id and password from the response
+      // Send response to the client
+    return res.status(201).json({
+      user: userWithoutId,
+      title: "User Created",
+      message: "User has been created successfully",
+      status: 201,
+    });
+  } catch (error) {
+    console.error("Error during SSO github sign-in:", error);
     return res.status(500).json({
       title: "Internal Server Error",
-      message: "There is something went wrong while getting access token",
+      message:
+        "There was an error processing your request. Please try again later.",
       status: 500,
     });
   }
-  console.log("Access token received from SSO");
+}
+async function getUserInfoFromGithub(token) {
+  let response;
+  console.log(token)
+  try {
+    response = await axios.get(
+      "https://api.github.com/user",
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json"
+        },
+      }
+    );
+  } catch (error) {
+    console.log("something went wrong while getting user info from google");
+  }
+  console.log(response);
+  return response.data;
+}
+async function getAccessTokenForGithub(code, originUrl, res) {
+  try {
+    console.log("url", originUrl + "/login");
+    originUrl = originUrl + "/login";
+
+    const token = await axios.post(
+      "https://github.com/login/oauth/access_token",
+      new URLSearchParams({
+        client_id: process.env.GITHUB_CLIENT_ID,
+        client_secret: process.env.GITHUB_SECRET,
+        code: code,
+        redirect_uri: originUrl,
+      }),
+      {
+        headers: {
+          Accept: "application/json",
+        },
+      }
+    );
+   // console.log(token);
+    return token.data.access_token;
+  } catch (error) {
+    console.log("error", error);
+    if (error.response.status == 400) {
+      return res.status(400).json({
+        status: 400,
+        title: "Bad Request",
+        message: "Invalid Grant request",
+      });
+    } else {
+      return res.status(500).json({
+        status: 500,
+        title: "Something Went wrong",
+        message: "Please try after sometime.",
+      });
+    }
+  }
+}
+async function loginWithGoogle(code, res) {
+  console.log("Code received from google SSO", code);
+  const token = await getAccessToken(code, res);
+  console.log("Access token received from google SSO");
   const userInfo = await getUserInfo(token);
   try {
     if (!userInfo) {
@@ -310,14 +478,14 @@ export async function SSOSignin(req, res) {
         status: 500,
       });
     }
-    console.log("User info received from SSO", userInfo);
+    console.log("User info received from google SSO", userInfo);
     const { email, name, picture } = userInfo;
     const isUserAlreadyPresent = await User.findOne({ email }).select(
       "-password -__v -createdAt -updatedAt -role -email -country -skills -linkedIn -mobileNumber -github -isVerified -verificationToken -loggedInType -resetPasswordToken"
     );
 
     if (isUserAlreadyPresent) {
-      console.log("User already exists");
+      console.log("User already in db exists from google sso");
       // Generate JWT token for the existing user
       const jwtTokens = jwt.sign(
         { id: isUserAlreadyPresent._id },
@@ -347,7 +515,7 @@ export async function SSOSignin(req, res) {
     }
     // As user logged in for the first time, we will create a new user and store password as hex
     // because we are not using password for SSO users
-    const tempPassword = crypto.randomBytes(32).toString("hex");
+    const tempPassword = await argon.hash(crypto.randomBytes(32).toString("hex"));
     const newUser = new User({
       email,
       name,
@@ -392,34 +560,55 @@ export async function SSOSignin(req, res) {
   }
 }
 
-async function getAccessToken(code, originUrl) {
-  const response = await axios.post(
-    "https://oauth2.googleapis.com/token",
-    new URLSearchParams({
-      code,
-      client_id:
-        "878291443758-klfu3caf4hnvj23vu5i5lgfj93g8gsh9.apps.googleusercontent.com",
-      client_secret: process.env.GOOGLE_SECRET,
-      redirect_uri: `${originUrl}/oauthify-redirect`,
-      grant_type: "authorization_code",
-    }),
-    {
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
+async function getAccessToken(code, res) {
+  try {
+    const response = await axios.post(
+      "https://oauth2.googleapis.com/token",
+      new URLSearchParams({
+        code,
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        client_secret: process.env.GOOGLE_SECRET,
+        redirect_uri: "postmessage",
+        grant_type: "authorization_code",
+      }),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }
+    );
+    return response.data.access_token;
+  } catch (error) {
+    console.log("error", error);
+    if (error.response.status == 400) {
+      return res.status(400).json({
+        status: 400,
+        title: "Bad Request",
+        message: "Invalid Grant request",
+      });
+    } else {
+      return res.status(500).json({
+        status: 500,
+        title: "Something Went wrong",
+        message: "Please try after sometime.",
+      });
     }
-  );
-  return response.data.access_token;
+  }
 }
 
 async function getUserInfo(token) {
-  const response = await axios.get(
-    "https://www.googleapis.com/oauth2/v1/userinfo",
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
+  let response;
+  try {
+    response = await axios.get(
+      "https://www.googleapis.com/oauth2/v1/userinfo",
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+  } catch (error) {
+    console.log("something went wrong while getting user info from google");
+  }
   return response.data;
 }
