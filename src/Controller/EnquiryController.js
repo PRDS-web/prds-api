@@ -1,4 +1,4 @@
-import { validateEmail } from "../Validator/FormValidator";
+import { validateEmail } from "../Validator/FormValidator.js";
 import Enquiry from "../Model/Enquiry.js";
 import { sendEmailForFirstTimeVerification } from "../Utils/Mail/Mailer.js";
 
