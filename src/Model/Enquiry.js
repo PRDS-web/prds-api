@@ -24,6 +24,6 @@ const enquirySchema = mongoose.Schema({
     timestamps: true
 });
 
-const enquiry = mongoose.model("Users",enquirySchema);
+const enquiry = mongoose.model("enquiry",enquirySchema);
 
 export default enquiry;
