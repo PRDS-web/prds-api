@@ -13,7 +13,7 @@ const port  = 8080;
 app.use(cors({
     origin: ["http://localhost:5173", "https://prds-ui.vercel.app", "https://www.pradetra.com"],
     credentials: true,
-    methods: ['GET','POST','PATCH','PUT'],
+    methods: ['GET','POST','PATCH','PUT', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
