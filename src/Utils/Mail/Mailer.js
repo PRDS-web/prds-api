@@ -62,6 +62,12 @@ export async function sendEmailForFirstTimeVerification(user, type) {
         .replace("{{name}}", user.name)
         .replace("{{reset_link}}", `${process.env.BASE_URL}/auth/reset-password?token=${user.resetPasswordToken}`),
     };
+  }else if( type == "contact us"){
+    mailOptions = {
+      to: user.email,
+      subject: "New Enquiry came",
+       text: "Please check in dashboard"
+    };
   }
 
   console.log("Triggering Mail from Mailer.js to ", user.email);

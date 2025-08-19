@@ -4,13 +4,14 @@ import cookieParser from 'cookie-parser';
 import ConnectWithDB from './Utils/DBConnection.js';
 import AuthRoutes from './Routes/Auth/AuthRoutes.js';
 import UserRoutes from './Routes/User/UserRoutes.js';
+import EnquiryRoutes from './Routes/Enquiry/EnquiryRoute.js';
 
 const app = express();
 const port  = 8080;
 
 
 app.use(cors({
-    origin: ["http://localhost:5173", "https://prds-ui.vercel.app"],
+    origin: ["http://localhost:5173", "https://prds-ui.vercel.app", "https://www.pradetra.com"],
     credentials: true,
     methods: ['GET','POST','PATCH','PUT'],
     allowedHeaders: ['Content-Type', 'Authorization']
@@ -28,6 +29,7 @@ app.get('/',(req, res) =>{
 
 app.use('/api/v1/auth',AuthRoutes);
 app.use('/api/v1/user',UserRoutes);
+app.use('api/v1/enquiry', EnquiryRoutes);
 
 app.listen(port,()=>{
     console.log("Initial Setup is done good to go now");
