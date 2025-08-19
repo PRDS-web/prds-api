@@ -11,11 +11,13 @@ const port  = 8080;
 
 
 app.use(cors({
-    origin: ["http://localhost:5173", "https://prds-ui.vercel.app", "https://www.pradetra.com"],
+    origin: ["http://localhost:5173", "https://prds-ui.vercel.app", "https://pradetra.com"],
     credentials: true,
     methods: ['GET','POST','PATCH','PUT', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+app.options("*", cors());
 
 app.use(express.json());
 app.use(cookieParser());
