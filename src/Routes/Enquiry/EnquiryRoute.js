@@ -2,6 +2,6 @@ import express from 'express';
 const enquiryRoutes = express.Router();
 import { userEnquiry } from '../../Controller/EnquiryController.js';
 
-enquiryRoutes.get('/contact_us',userEnquiry);
+enquiryRoutes.get('/contactUs',userEnquiry);
 
 export default enquiryRoutes;
