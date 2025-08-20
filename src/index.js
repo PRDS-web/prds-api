@@ -17,7 +17,7 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-app.options("*", cors());
+
 
 app.use(express.json());
 app.use(cookieParser());
@@ -31,7 +31,7 @@ app.get('/',(req, res) =>{
 
 app.use('/api/v1/auth',AuthRoutes);
 app.use('/api/v1/user',UserRoutes);
-app.use('api/v1/enquiry', EnquiryRoutes);
+app.use('/api/v1/enquiry', EnquiryRoutes);
 
 app.listen(port,()=>{
     console.log("Initial Setup is done good to go now");
