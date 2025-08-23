@@ -3,7 +3,7 @@ import Enquiry from "../Model/Enquiry.js";
 import { sendEmailForFirstTimeVerification } from "../Utils/Mail/Mailer.js";
 
 export const userEnquiry = async (req,res) => {
-    const { email, name, country, message } = req.body;
+    let { email, name, country, message } = req.body;
 
     if(email== null || name == null || country ==null || message == null){
         return res.status(400).json({

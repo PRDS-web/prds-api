@@ -1,6 +1,8 @@
 import nodemailer from "nodemailer";
 import fs from "fs";
 import path from "path";
+import { google } from 'googleapis';
+
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -15,14 +17,26 @@ const resetPasswordMailTemplate = fs.readFileSync(
 );
 
 export async function sendEmailForFirstTimeVerification(user, type) {
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_SECRET,
+    "https://developers.google.com/oauthplayground"
+  );
+  oauth2Client.setCredentials({
+    refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+  });
+
+  const accessToken = await oauth2Client.getAccessToken();
   const transporter = nodemailer.createTransport({
-    service: "Gmail",
+    service: "gmail",
     auth: {
-      user: process.env.EMAIL,
-      pass: process.env.EMAIL_PASSWORD,
+      type: "OAuth2",
+      user: "no-reply@pradetra.com",
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_SECRET,
+      refreshToken: process.env.GOOGLE_REFRESH_TOKEN_NO_REPLY,
+      accessToken: accessToken.token,
     },
-    secure: true,
-    connectionTimeout: 6000,
   });
   await new Promise((resolve, reject) => {
     // verify connection configuration
