@@ -38,7 +38,7 @@ export async function getAllUsers(req, res) {
         const users = await User.find().select("-password -__v");
         console.log("All users retrieved:", users);
         return res.status(200).json({
-            users,
+            user: users,
             message: "All users retrieved successfully.",
             title: "All Users",
             status: 200
@@ -89,4 +89,51 @@ export async function updateProfile(req, res) {
             status: 500
         });
     }
+}
+
+export async function updateRole (req, res) {
+    const { userId, role } = req.body;
+
+    if (!userId || !role) {
+        return res.status(400).json({
+            message: "User ID and role are required.",
+            title: "Bad Request",
+            status: 400
+        });
+    }
+
+
+    try {
+        // Update user role in the database
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            { role },
+            { new: true }
+        ).select("-password -__v");
+
+        if (!updatedUser) {
+            return res.status(404).json({
+                message: "User not found.",
+                title: "Not Found",
+                status: 404
+            });
+        }
+
+        console.log("User role updated:", updatedUser);
+        return res.status(200).json({
+            user: updatedUser,
+            message: "User role updated successfully.",
+            title: "Role Updated",
+            status: 200
+        });
+
+    } catch (error) {
+        console.error("Error updating user role:", error);
+        return res.status(500).json({
+            message: "Internal server error while updating user role.",
+            title: "Server Error",
+            status: 500
+        });
+    }
+
 }

@@ -54,6 +54,21 @@ export const userEnquiry = async (req,res) => {
         status: 200
     })
 }
-
-
-
+export const getAllEnquiries = async (req,res) => {
+    try {
+        const enquiries = await Enquiry.find().sort({ createdAt: -1 }); 
+        return res.status(200).json({
+            enquiries,
+            message: "Enquiries fetched successfully",
+            title: "Enquiries",
+            status: 200
+        });
+    } catch (error) {
+        console.error("Error fetching enquiries:", error);
+        return res.status(500).json({
+            message: "Internal server error while fetching enquiries.",
+            title: "Server Error",
+            status: 500
+        });
+    }   
+}
