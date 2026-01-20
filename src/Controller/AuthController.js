@@ -9,6 +9,8 @@ import jwt from "jsonwebtoken";
 import { sendEmailForFirstTimeVerification } from "../Utils/Mail/Mailer.js";
 import axios from "axios";
 import dotenv from "dotenv";
+import { publishJobEvent } from "../SQSClient/queuePublisher.js";
+import e from "express";
 
 dotenv.config();
 
@@ -17,7 +19,7 @@ export async function registerUser(req, res) {
   const validateIntput = validateRegisterUserIntput(
     email.trim(),
     password.trim(),
-    confirmPassword.trim()
+    confirmPassword.trim(),
   );
   try {
     if (Object.keys(validateIntput).length != 0) {
@@ -86,20 +88,6 @@ export async function registerUser(req, res) {
       password: hashedPassword,
       loggedInType: "EmailAndPassword",
     });
-    const jwtToken = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
-      issuer: "prds-api",
-    });
-
-    console.log("Cookies generated successfully");
-
-    res.cookie("authToken", jwtToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "none",
-      maxAge: 1000 * 60 * 60 * 24 * 7,
-    });
-
     const token = crypto.randomBytes(32).toString("hex");
     newUser.verificationToken = token;
     await newUser.save();
@@ -109,7 +97,7 @@ export async function registerUser(req, res) {
     sendEmailForFirstTimeVerification(newUser, "verification").catch(
       (error) => {
         console.log("There is something went wrong from email service", error);
-      }
+      },
     );
 
     console.log("Verification mail tried to send", newUser.email);
@@ -137,71 +125,36 @@ export async function verifyUser(req, res) {
     console.log("Checking token if it there in db or not", verificationToken);
     const isTokenThere = await User.findOne({ verificationToken });
     if (!isTokenThere) {
-      return res.status(404).send(`
-  <html>
-    <head>
-      <title>404 - Not Found</title>
-      <style>
-        body { font-family: Arial; text-align: center; margin-top: 50px; }
-        .error { color: red; font-size: 1.5em; }
-      </style>
-    </head>
-    <body>
-      <div class="error">404 - Page Not Found</div>
-      <p>Verification link is invalid. Please try again requesting Verification link using forgot password</p>
-    </body>
-  </html>
-`);
+      return res.status(404).json({
+        message:
+          "Verification link is invalid. Please try again requesting Verification link using forgot password",
+        title: "Invalid Verification Link",
+        status: 404,
+      });
     }
     if (isTokenThere.isVerified) {
-      return res.status(200).send(`<html>
-    <head>
-      <title>Already Verified</title>
-      <style>
-        body { font-family: Arial; text-align: center; margin-top: 50px; }
-        .info { color: #007bff; font-size: 1.5em; }
-      </style>
-    </head>
-    <body>
-      <div class="info">Your email is already verified!</div>
-      <p>You can now log in and use your account.</p>
-    </body>
-  </html>
-`);
+      return res.status(200).json({
+        message: "Your email is already verified!",
+        title: "Already Verified",
+        status: 200,
+      });
     }
     isTokenThere.isVerified = true;
     isTokenThere.verificationToken = null; // Clear the verification token after successful verification
     await isTokenThere.save();
-    return res.status(200).send(` <html>
-      <head>
-        <title>Verification Successful</title>
-        <style>
-          body { font-family: Arial; text-align: center; margin-top: 50px; }
-          .success { color: green; font-size: 1.5em; }
-        </style>
-      </head>
-      <body>
-        <div class="success">Your email has been successfully verified!</div>
-        <p>You can now close this page and log in.</p>
-      </body>
-  </html>`);
+    return res.status(200).json({
+      message: "Your email has been successfully verified!",
+      title: "Verification Successful",
+      status: 200,
+    });
   } catch (error) {
     console.log("Something went wrong from verifyUser method", error);
-    return res.status(500).send(`
-  <html>
-    <head>
-      <title>Internal Server Error</title>
-      <style>
-        body { font-family: Arial; text-align: center; margin-top: 50px; }
-        .error { color: #dc3545; font-size: 1.5em; }
-      </style>
-    </head>
-    <body>
-      <div class="error">500 - Internal Server Error</div>
-      <p>There was a problem while verifying your account. Please try again later.</p>
-    </body>
-  </html>
-`);
+    return res.status(500).json({
+      message:
+        "There was a problem while verifying your account. Please try again later.",
+      title: "Internal Server Error",
+      status: 500,
+    });
   }
 }
 
@@ -217,7 +170,7 @@ export async function loginUser(req, res) {
   }
 
   const isValidUser = await User.findOne({ email }).select(
-    "-__v -createdAt -updatedAt -role -country -skills -linkedIn -mobileNumber -github -verificationToken -loggedInType -resetPasswordToken"
+    "-__v -createdAt -updatedAt -role -country -skills -linkedIn -mobileNumber -github -verificationToken -loggedInType -resetPasswordToken",
   );
 
   if (isValidUser == null || isValidUser == undefined) {
@@ -236,9 +189,8 @@ export async function loginUser(req, res) {
   }
   const isValidPassword = await argon.verify(isValidUser.password, password);
   console.log("from login user", isValidPassword);
-
+  res.clearCookie("authToken");
   if (!isValidPassword) {
-    res.clearCookie("authToken");
     return res.status(401).json({
       title: "Incorrect Password",
       message: "Password is not correct. please enter valid password",
@@ -318,80 +270,98 @@ export async function SSOSignin(req, res) {
       });
     }
     console.log("User info received from github SSO", userInfo);
-    const { email, name, id,login, avatar_url, html_url } = userInfo;
+    const { email, name, id, login, avatar_url, html_url } = userInfo;
     const userSearch = User.findOne({
       $or: [
         {
           githubId: id,
-          email
-        }
-      ]
+          email,
+        },
+      ],
     }).select(
-        "-password -__v -createdAt -updatedAt -role -email -country -skills -linkedIn -mobileNumber -github -isVerified -verificationToken -loggedInType -resetPasswordToken"
+      "-password -__v -createdAt -updatedAt -role -email -country -skills -linkedIn -mobileNumber -github -isVerified -verificationToken -loggedInType -resetPasswordToken",
+    );
+
+    if (!userSearch) {
+      console.log("User already exists in db from github sso");
+      // Generate JWT token for the existing user
+      const jwtTokens = jwt.sign(
+        { id: isUserAlreadyPresent._id },
+        process.env.JWT_SECRET,
+        {
+          expiresIn: "7d",
+          issuer: "prds-api",
+        },
       );
-
-    if(!userSearch){
-        console.log("User already exists in db from github sso");
-        // Generate JWT token for the existing user
-        const jwtTokens = jwt.sign(
-          { id: isUserAlreadyPresent._id },
-          process.env.JWT_SECRET,
-          {
-            expiresIn: "7d",
-            issuer: "prds-api",
-          }
-        );
-        console.log("Cookies generated successfully");
-        res.cookie("authToken", jwtTokens, {
-          httpOnly: true,
-          secure: true,
-          sameSite: "none",
-          maxAge: 1000 * 60 * 60 * 24 * 7,
-        });
-        console.log("User logged in successfully", isUserAlreadyPresent.name);
-        // Here toObject is used because when we get the user from DB that is not a plain object
-        // its a mongoose document so we need to convert it to plain object for that we use toObject method
-        const { _id, ...userWithoutId } = isUserAlreadyPresent.toObject(); // Remove _id from the response
-        return res.status(200).json({
-          user: userWithoutId,
-          title: "User Logged In",
-          message: "User has been logged in successfully",
-          status: 200,
-        });
-    }
-    // As user logged in for the first time, we will create a new user and store password as hex
-      // because we are not using password for SSO users
-      const tempPassword = await argon.hash(crypto.randomBytes(32).toString("hex"));
-      const newUser = new User({
-        email: email==null?'NA':email,
-        name,
-        picture: avatar_url,
-        githubId: id,
-        github: html_url,
-        userId: login,
-        loggedInType: "GithubSSO",
-        isVerified: true,
-        verificationToken: null,
-        password: tempPassword, // Store the JWT token as password for SSO users
-      });
-      await newUser.save();
-
-      console.log("New user created successfully", newUser);
-      const jwtToken = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET, {
-        expiresIn: "7d",
-        issuer: "prds-api",
-      });
-
       console.log("Cookies generated successfully");
-      res.cookie("authToken", jwtToken, {
+      res.cookie("authToken", jwtTokens, {
         httpOnly: true,
         secure: true,
         sameSite: "none",
         maxAge: 1000 * 60 * 60 * 24 * 7,
       });
-      console.log("User logged in successfully", newUser.name);
-      const { _id, password,githubId,isVerified,linkedIn,mobileNumber,verificationToken,_v,country,createdAt,skills,updatedAt,loggedInType,github,  ...userWithoutId } = newUser.toObject(); // Remove _id and password from the response
-      // Send response to the client
+      console.log("User logged in successfully", isUserAlreadyPresent.name);
+      // Here toObject is used because when we get the user from DB that is not a plain object
+      // its a mongoose document so we need to convert it to plain object for that we use toObject method
+      const { _id, ...userWithoutId } = isUserAlreadyPresent.toObject(); // Remove _id from the response
+      return res.status(200).json({
+        user: userWithoutId,
+        title: "User Logged In",
+        message: "User has been logged in successfully",
+        status: 200,
+      });
+    }
+    // As user logged in for the first time, we will create a new user and store password as hex
+    // because we are not using password for SSO users
+    const tempPassword = await argon.hash(
+      crypto.randomBytes(32).toString("hex"),
+    );
+    const newUser = new User({
+      email: email == null ? "NA" : email,
+      name,
+      picture: avatar_url,
+      githubId: id,
+      github: html_url,
+      userId: login,
+      loggedInType: "GithubSSO",
+      isVerified: true,
+      verificationToken: null,
+      password: tempPassword, // Store the JWT token as password for SSO users
+    });
+    await newUser.save();
+
+    console.log("New user created successfully", newUser);
+    const jwtToken = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+      issuer: "prds-api",
+    });
+
+    console.log("Cookies generated successfully");
+    res.cookie("authToken", jwtToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+      maxAge: 1000 * 60 * 60 * 24 * 7,
+    });
+    console.log("User logged in successfully", newUser.name);
+    const {
+      _id,
+      password,
+      githubId,
+      isVerified,
+      linkedIn,
+      mobileNumber,
+      verificationToken,
+      _v,
+      country,
+      createdAt,
+      skills,
+      updatedAt,
+      loggedInType,
+      github,
+      ...userWithoutId
+    } = newUser.toObject(); // Remove _id and password from the response
+    // Send response to the client
     return res.status(201).json({
       user: userWithoutId,
       title: "User Created",
@@ -410,17 +380,13 @@ export async function SSOSignin(req, res) {
 }
 async function getUserInfoFromGithub(token) {
   let response;
-  console.log(token)
   try {
-    response = await axios.get(
-      "https://api.github.com/user",
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json"
-        },
-      }
-    );
+    response = await axios.get("https://api.github.com/user", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    });
   } catch (error) {
     console.log("something went wrong while getting user info from google");
   }
@@ -444,9 +410,9 @@ async function getAccessTokenForGithub(code, originUrl, res) {
         headers: {
           Accept: "application/json",
         },
-      }
+      },
     );
-   // console.log(token);
+    // console.log(token);
     return token.data.access_token;
   } catch (error) {
     console.log("error", error);
@@ -481,7 +447,7 @@ async function loginWithGoogle(code, res) {
     console.log("User info received from google SSO", userInfo);
     const { email, name, picture } = userInfo;
     const isUserAlreadyPresent = await User.findOne({ email }).select(
-      "-password -__v -createdAt -updatedAt -role -email -country -skills -linkedIn -mobileNumber -github -isVerified -verificationToken -loggedInType -resetPasswordToken"
+      "-password -__v -createdAt -updatedAt -role -email -country -skills -linkedIn -mobileNumber -github -isVerified -verificationToken -loggedInType -resetPasswordToken",
     );
 
     if (isUserAlreadyPresent) {
@@ -493,7 +459,7 @@ async function loginWithGoogle(code, res) {
         {
           expiresIn: "7d",
           issuer: "prds-api",
-        }
+        },
       );
       console.log("Cookies generated successfully");
       res.cookie("authToken", jwtTokens, {
@@ -515,7 +481,9 @@ async function loginWithGoogle(code, res) {
     }
     // As user logged in for the first time, we will create a new user and store password as hex
     // because we are not using password for SSO users
-    const tempPassword = await argon.hash(crypto.randomBytes(32).toString("hex"));
+    const tempPassword = await argon.hash(
+      crypto.randomBytes(32).toString("hex"),
+    );
     const newUser = new User({
       email,
       name,
@@ -575,7 +543,7 @@ async function getAccessToken(code, res) {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
-      }
+      },
     );
     return response.data.access_token;
   } catch (error) {
@@ -605,10 +573,96 @@ async function getUserInfo(token) {
         headers: {
           Authorization: `Bearer ${token}`,
         },
-      }
+      },
     );
   } catch (error) {
     console.log("something went wrong while getting user info from google");
   }
   return response.data;
 }
+export const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({
+        message: "User with this email does not exist.",
+        title: "User Not Found",
+        status: 404,
+      });
+    }
+    const resetToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "3d",
+      issuer: "prds-api",
+    });
+    user.resetPasswordToken = resetToken;
+    await user.save();
+    console.log(
+      "Generated verification token for password reset and saved in db",
+    );
+    await publishJobEvent({
+      eventType: "PASSWORD_RESET_REQUESTED",
+      token: resetToken,
+      email: user.email,
+      name: user.name,
+    });
+    console.log("Published PASSWORD_RESET_REQUESTED event to SQS");
+    // Here you would typically generate a reset token and send an email
+    return res.status(200).json({
+      message: "Password reset link has been sent to your email.",
+      title: "Reset Link Sent",
+      status: 200,
+    });
+  } catch (error) {
+    console.error("Error in forgot password:", error);
+    return res.status(500).json({
+      message: "Internal server error while processing forgot password.",
+      title: "Server Error",
+      status: 500,
+    });
+  }
+};
+export const resetPassword = async (req, res) => {
+  const { token, newPassword } = req.body;
+  try {
+    if (!token || !newPassword) {
+      return res.status(400).json({
+        message: "Token and new password are required.",
+        title: "Bad Request",
+        status: 400,
+      });
+    }
+
+    const { id, exp, iss } = jwt.verify(token, process.env.JWT_SECRET);
+    if (iss !== process.env.ISSUER || exp < Math.floor(new Date() / 1000)) {
+      return res.status(401).json({
+        message: "Invalid or expired password reset url. Please try again request from requesting password.",
+        title: "Invalid Token",
+        status: 401,
+      });
+    }
+    const user = await User.findOne({ resetPasswordToken: token });
+    if (!user) {
+      return res.status(400).json({
+        message: "Invalid or expired password reset link.",
+        title: "Invalid Token",
+        status: 400,
+      });
+    }
+    user.password = await argon.hash(newPassword);
+    user.resetPasswordToken = null;
+    await user.save();
+    return res.status(200).json({
+      message: "Password has been reset successfully.",
+      title: "Password Reset Successful",
+      status: 200,
+    });
+  } catch (error) {
+    console.error("Error in reset password:", error);
+    return res.status(500).json({
+      message: "Internal server error while resetting password.",
+      title: "Server Error",
+      status: 500,
+    });
+  }
+};

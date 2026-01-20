@@ -60,7 +60,10 @@ const userSchema = mongoose.Schema({
         required:  true
     },
     loggedInType: String,
-    resetPasswordToken: String,
+    resetPasswordToken: {
+        type: String,
+        default: 'NA'
+    }
 },{
     timestamps: true
 });
