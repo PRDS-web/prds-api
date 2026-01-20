@@ -59,15 +59,15 @@ export async function sendEmailForFirstTimeVerification(user, type) {
         .replace("{{userName}}", user.name)
         .replace(
           "{{verificationLink}}",
-          `${process.env.BASE_URL}/auth/verify/?token=${user.verificationToken}`
+          `${process.env.FRONTEND_BASE_URL}/verify/?token=${user.verificationToken}`
         )
         .replace(
           "{{verificationLink}}",
-          `${process.env.BASE_URL}/auth/verify/?token=${user.verificationToken}`
+          `${process.env.FRONTEND_BASE_URL}/verify/?token=${user.verificationToken}`
         )
         .replace(
           "{{verificationLink}}",
-          `${process.env.BASE_URL}/auth/verify/?token=${user.verificationToken}`
+          `${process.env.FRONTEND_BASE_URL}/verify/?token=${user.verificationToken}`
         ),
     };
   } else if (type === "resetPassword") {
