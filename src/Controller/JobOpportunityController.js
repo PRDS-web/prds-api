@@ -151,21 +151,21 @@ export const applyJob = async (req, res) => {
   // const token = req.cookies.authToken;
   //  const {id, exp, iss} = jwt.verify(token, process.env.JWT_SECRET);
   // Validate required fields
-  if (
-    !jobId ||
-    !firstName ||
-    !email ||
-    !phoneNumber ||
-    !experience ||
-    !linkedIn ||
-    !skills ||
-    !userId
-  ) {
-    return res.status(400).json({
-      message: "All fields are required",
-      status: 400,
-    });
-  }
+  // if (
+  //   !jobId ||
+  //   !firstName ||
+  //   !email ||
+  //   !phoneNumber ||
+  //   !experience ||
+  //   !linkedIn ||
+  //   !skills ||
+  //   !userId
+  // ) {
+  //   return res.status(400).json({
+  //     message: "All fields are required",
+  //     status: 400,
+  //   });
+  // }
   try {
     const isJobExist = await Job.findById(jobId);
     if (!isJobExist) {
