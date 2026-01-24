@@ -208,10 +208,10 @@ export async function loginUser(req, res) {
   res.cookie("authToken", jwtToken, {
     httpOnly: true,
     secure: true,
-    sameSite: "none",
+    sameSite: "lax",
     maxAge: 1000 * 60 * 60 * 24 * 7,
   });
-  const { _id, password: _, ...userWithoutId } = isValidUser.toObject(); // Remove _id and password from the response
+  const { password: _, ...userWithoutId } = isValidUser.toObject(); // Remove _id and password from the response
 
   return res.status(200).json({
     user: userWithoutId,
@@ -666,3 +666,11 @@ export const resetPassword = async (req, res) => {
     });
   }
 };
+
+export const isUserLoggedIn = async (req, res) => {
+  return res.status(200).json({
+    message: "User is logged in",
+    title: "User Logged In Status",
+    status: 200
+  });
+}
