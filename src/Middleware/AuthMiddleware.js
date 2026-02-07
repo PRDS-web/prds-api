@@ -6,7 +6,6 @@ env.config();
 
 export async function verifyToken(req, res, next) {
     const token = req.cookies.authToken;
-    console.log("Token received:", token); 
     if (!token) {
         return res.status(401).json({
             message: "Unauthorized access, token is missing, please login again.",
@@ -35,7 +34,6 @@ export async function verifyToken(req, res, next) {
         }
         // If everything is fine we are attaching the user id to the request object so that we can use it
         req.userId = id;
-        console.log("User ID from token:", req.userId); 
         next();
     } catch (error) {
         return res.status(401).json({

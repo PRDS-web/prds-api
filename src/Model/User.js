@@ -63,6 +63,11 @@ const userSchema = mongoose.Schema({
     resetPasswordToken: {
         type: String,
         default: 'NA'
+    },
+    bankAccountId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'bankingDetails',
+        default: null
     }
 },{
     timestamps: true
